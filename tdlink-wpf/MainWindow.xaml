@@ -1,0 +1,294 @@
+﻿<Window x:Class="tdlink_wpf.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:tdlink_wpf"
+        mc:Ignorable="d"
+        Title="MainWindow" Height="450" Width="800"
+        MinHeight="250" MinWidth="450"
+        Loaded="Window_Loaded" Closed="Window_Closed">
+    <Window.Resources>
+        <!--文字信息模板-->
+        <DataTemplate x:Key="MessageTextTemplate"
+                      DataType="{x:Type local:TextMessage}">
+            <StackPanel>
+                <TextBlock Text="{Binding Time}"
+                           HorizontalAlignment="Center"
+                           Foreground="Gray"/>
+
+                <Border Background="LightSkyBlue"
+                        HorizontalAlignment="{Binding Align}"
+                        CornerRadius="5">
+                    <TextBox Margin="10"
+                             IsReadOnly="True"
+                             BorderThickness="0"
+                             Background="LightSkyBlue"
+                             HorizontalAlignment="Center"
+                             TextWrapping="Wrap"
+                             Text="{Binding Content}"/>
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+        <!--文件信息模板-->
+        <DataTemplate x:Key="MessageFileTemplate"
+                      DataType="{x:Type local:FileMessage}">
+            <StackPanel>
+                <TextBlock Text="{Binding Time}"
+                           HorizontalAlignment="Center"
+                           Foreground="Gray"/>
+
+                <Border Background="Khaki"
+                        HorizontalAlignment="{Binding Alignment}"
+                        CornerRadius="5">
+                    <StackPanel Margin="10"
+                                VerticalAlignment="Bottom">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Margin="0,0,10,0"
+                                       Text="{Binding Name}"
+                                       TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding FormatedSize}"/>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Right">
+                            <!--默认不可见-->
+                            <StackPanel Orientation="Horizontal"
+                                        Name="afterSaved"
+                                        Visibility="Collapsed">
+                                <TextBlock Margin="0,0,10,0">
+                                    <Hyperlink Click="OpenButton_Click">打开</Hyperlink>
+                                </TextBlock>
+                                <TextBlock Margin="0,0,10,0">
+                                    <Hyperlink Click="OpenFolderButton_Click">目录</Hyperlink>
+                                </TextBlock>
+                            </StackPanel>
+                            <TextBlock Margin="0,0,10,0">
+                                <Hyperlink Click="ReciveFileAsButton_Click">另存为</Hyperlink>
+                            </TextBlock>
+                            <TextBlock>
+                                <Hyperlink Click="ReciveFileButton_Click">保存</Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+        <!--图片信息模板-->
+        <DataTemplate x:Key="MessageImageTemplate"
+                      DataType="{x:Type local:FileMessage}">
+            <StackPanel>
+                <TextBlock Text="{Binding Time}"
+                           HorizontalAlignment="Center"
+                           Foreground="Gray"/>
+
+                <Border Background="Ivory"
+                        HorizontalAlignment="{Binding Alignment}"
+                        MaxWidth="400"
+                        MaxHeight="800"
+                        CornerRadius="5">
+                    <Grid Margin="10"
+                            VerticalAlignment="Bottom">
+                        <Grid.RowDefinitions>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                            <RowDefinition/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal"
+                                    Grid.Row="0"
+                                    Margin="10"
+                                    VerticalAlignment="Bottom">
+                            <TextBlock Margin="0,0,10,0"
+                                   Text="{Binding Name}"
+                                   TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding FormatedSize}"
+                                   Margin="0,0,10,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal"
+                                    Grid.Row="1"
+                                    HorizontalAlignment="Right">
+                            <StackPanel Orientation="Horizontal"
+                                        Name="afterSaved"
+                                        Visibility="Collapsed">
+                                <TextBlock Margin="0,0,10,0">
+                                    <Hyperlink Click="OpenButton_Click">打开</Hyperlink>
+                                </TextBlock>
+                                <TextBlock Margin="0,0,10,0">
+                                    <Hyperlink Click="OpenFolderButton_Click">目录</Hyperlink>
+                                </TextBlock>
+                            </StackPanel>
+                            <TextBlock Margin="0,0,10,0">
+                                <Hyperlink Click="ReciveFileAsButton_Click">另存为</Hyperlink>
+                            </TextBlock>
+                            <TextBlock Margin="0,0,10,0">
+                                <Hyperlink Click="ReciveFileButton_Click">保存</Hyperlink>
+                            </TextBlock>
+                            <TextBlock>
+                                    <Hyperlink Click="ReviewImageButton_Click">预览</Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                        <Image Name="image"
+                               Visibility="Collapsed"
+                               Grid.Row="2"
+                               Stretch="Uniform"
+                               Margin="10"/>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+        <!--接收媒体信息模板-->
+        <local:ProgressConverter x:Key="ProgressConverter"/>
+        <DataTemplate x:Key="MessageMediaTemplate"
+                      DataType="{x:Type local:FileMessage}">
+            <StackPanel>
+                <TextBlock Text="{Binding Time}"
+                           HorizontalAlignment="Center"
+                           Foreground="Gray"/>
+
+                <Border Background="DimGray"
+                        HorizontalAlignment="{Binding Alignment}"
+                        MaxWidth="400"
+                        MaxHeight="800"
+                        CornerRadius="5">
+                    <Grid Margin="10"
+                            VerticalAlignment="Bottom">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="auto"/>
+                            <RowDefinition Height="auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Orientation="Horizontal"
+                                    Grid.Row="0"
+                                    Margin="10"
+                                    VerticalAlignment="Bottom">
+                            <TextBlock Margin="0,0,10,0"
+                                   Text="{Binding Name}"
+                                   TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding FormatedSize}"
+                                   Margin="0,0,10,0"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal"
+                                    Grid.Row="1"
+                                    HorizontalAlignment="Right">
+                            <StackPanel Orientation="Horizontal"
+                                        Name="afterSaved"
+                                        Visibility="Collapsed">
+                                <TextBlock Margin="0,0,10,0">
+                                    <Hyperlink Click="OpenButton_Click">打开</Hyperlink>
+                                </TextBlock>
+                                <TextBlock Margin="0,0,10,0">
+                                    <Hyperlink Click="OpenFolderButton_Click">目录</Hyperlink>
+                                </TextBlock>
+                            </StackPanel>
+                            <TextBlock Margin="0,0,10,0">
+                                <Hyperlink Click="ReciveFileAsButton_Click">另存为</Hyperlink>
+                            </TextBlock>
+                            <TextBlock Margin="0,0,10,0">
+                                <Hyperlink Click="ReciveFileButton_Click">保存</Hyperlink>
+                            </TextBlock>
+                            <TextBlock>
+                                    <Hyperlink Click="ReviewMediaButton_Click">预览</Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                        <MediaElement x:Name="mediaElement"
+                                          Grid.Row="2"
+                                          Stretch="Uniform"
+                                          Visibility="Collapsed"
+                                          Margin="10"
+                                          ToolTip="暂停"
+                                          LoadedBehavior="Manual"
+                                          MouseLeftButtonDown="MediaElement_MouseLeftButtonDown"
+                                          MediaEnded="MediaElement_MediaEnded">
+                        </MediaElement>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+    </Window.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="ContactColumn" MinWidth="128"/>
+            <ColumnDefinition x:Name="MessageColumn" Width="0"/>
+        </Grid.ColumnDefinitions>
+        <ListView Name="ContactsList"
+                  Grid.Column="0"
+                  SelectionChanged="ContactsList_SelectionChanged"
+                  MouseLeftButtonDown="ContactsList_MouseLeftButtonDown">
+            <ListView.ItemTemplate>
+                <DataTemplate DataType="x:Type local:Contact">
+                    <StackPanel Margin="10">
+                        <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding Addr}" Foreground="Gray"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="7*" MinHeight="100"/>
+                <RowDefinition Height="3*" MinHeight="100"/>
+            </Grid.RowDefinitions>
+            <!--信息框-->
+            <ListView Name="MessageList"
+                      Grid.Row="0"
+                      HorizontalContentAlignment="Stretch"
+                      AllowDrop="True"
+                      DragEnter="Message_DragEnter"
+                      Drop="Message_Drop"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                      ScrollViewer.CanContentScroll="False">
+                
+
+                <ListView.ItemTemplateSelector>
+                    <local:MessageSelector TextTemplate="{StaticResource MessageTextTemplate}"
+                                           FileTemplate="{StaticResource MessageFileTemplate}"
+                                           ImageTemplate="{StaticResource MessageImageTemplate}"
+                                           MediaTemplate="{StaticResource MessageMediaTemplate}"/>
+                </ListView.ItemTemplateSelector>
+
+            </ListView>
+            <!--信息输入框-->
+            <TextBox x:Name="MessageInputBox"
+                     Grid.Row="1"
+                     TextWrapping="Wrap"
+                     KeyDown="MessageInputBox_KeyDown"/>
+            <StackPanel Grid.Row="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        Margin="20">
+                <Button Content="文件"
+                        Click="FileButton_Click"
+                        Background="SteelBlue"
+                        Width="60"
+                        Height="30"
+                        Margin="0,0,10,0">
+                    <Button.Resources>
+                        <Style TargetType="{x:Type Border}">
+                            <Setter Property="CornerRadius" Value="5"/>
+                        </Style>
+                    </Button.Resources>
+                </Button>
+                <Button Content="发送"
+                        Click="SendButton_Click"
+                        Background="SteelBlue"
+                        Width="60"
+                        Height="30">
+                    <Button.Resources>
+                        <Style TargetType="{x:Type Border}">
+                            <Setter Property="CornerRadius" Value="5"/>
+                        </Style>
+                    </Button.Resources>
+                </Button>
+            </StackPanel>
+            <GridSplitter Grid.Row="0"
+                            VerticalAlignment="Bottom"
+                            HorizontalAlignment="Stretch"
+                            Height="2"/>
+        </Grid>
+        <GridSplitter Grid.Column="0"
+                      HorizontalAlignment="Right"
+                      Margin="1, 1, 0, 1"
+                      Width="2"/>
+    </Grid>
+</Window>
