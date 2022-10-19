@@ -223,7 +223,8 @@
                 </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>
-        <Grid Grid.Column="1">
+        <Grid Grid.Column="1"
+              x:Name="MessageGrid">
             <Grid.RowDefinitions>
                 <RowDefinition Height="7*" MinHeight="100"/>
                 <RowDefinition Height="3*" MinHeight="100"/>
@@ -234,6 +235,7 @@
                       HorizontalContentAlignment="Stretch"
                       AllowDrop="True"
                       DragEnter="Message_DragEnter"
+                      DragOver="Message_DragEnter"
                       Drop="Message_Drop"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                       ScrollViewer.CanContentScroll="False">
@@ -251,7 +253,16 @@
             <TextBox x:Name="MessageInputBox"
                      Grid.Row="1"
                      TextWrapping="Wrap"
-                     KeyDown="MessageInputBox_KeyDown"/>
+                     ContextMenu="{x:Null}"
+                     AllowDrop="True"
+                     PreviewDragOver="Message_DragEnter"
+                     PreviewDrop="Message_Drop"
+                     KeyDown="MessageInputBox_KeyDown">
+                <!--重绑定粘贴判定事件-->
+                <TextBox.CommandBindings>
+                    <CommandBinding Command="ApplicationCommands.Paste" CanExecute="MessagePasting_CanExecuted"/>
+                </TextBox.CommandBindings>
+            </TextBox>
             <StackPanel Grid.Row="1"
                         Orientation="Horizontal"
                         HorizontalAlignment="Right"

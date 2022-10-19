@@ -10,11 +10,13 @@ using System.Security.Policy;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -97,60 +99,107 @@ namespace tdlink_wpf
 
         private void Message_DragEnter(object sender, DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
-                e.Effects = DragDropEffects.Link;
-            else
+            if (e.Data.GetDataPresent(DataFormats.Text) ||
+                e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
                 e.Effects = DragDropEffects.Copy;
+                e.Handled = true;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+                e.Handled = false;
+            }
+        }
+        private void Message_Drop(object sender, DragEventArgs e)
+        {
+            Message_SendData(e.Data);
         }
 
-        private async void Message_Drop(object sender, DragEventArgs e)
+        private void MessagePasting_CanExecuted(object sender, CanExecuteRoutedEventArgs e)
+        {
+            if (Clipboard.ContainsText())
+            {
+                e.CanExecute = true;
+            }
+            else
+            {
+                Message_SendData(Clipboard.GetDataObject());
+                e.CanExecute = false;
+            }
+        }
+        private async void Message_SendData(IDataObject dataObject)
         {
             if (ContactsList.SelectedItem is Contact contact)
             {
-                if (e.Data.GetDataPresent(DataFormats.FileDrop))
+                if (dataObject.GetDataPresent(DataFormats.Bitmap))
                 {
-                    foreach (var path in (Array)e.Data.GetData(DataFormats.FileDrop))
-                        contact.SendFile(path.ToString()!);
+                    var path = "ImageCache\\" + Path.GetRandomFileName() + ".png";
+                    var bitmap = (InteropBitmap)dataObject.GetData(DataFormats.Bitmap);
+                    var encoder = new PngBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                    var stream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite);
+                    encoder.Save(stream);
+                    stream.Close();
+                    contact.SendFile(path);
                 }
-                else if (e.Data.GetDataPresent(DataFormats.Html))
+                else if (dataObject.GetDataPresent(DataFormats.FileDrop))
                 {
-                    var data = (string)e.Data.GetData(DataFormats.Html);
+                    foreach (var path in (string[])dataObject.GetData(DataFormats.FileDrop))
+                        contact.SendFile(path);
+                }
+                else if (dataObject.GetDataPresent(DataFormats.Html))
+                {
+                    var data = (string)dataObject.GetData(DataFormats.Html);
                     // 正则匹配img
-                    var regImg = new Regex(@"<img\b[^<>]*?\bsrc[\s\t\r\n]*=[\s\t\r\n]*[""']?[\s\t\r\n]*(?<imgUrl>[^\s\t\r\n""'<>]*)[^<>]*?/?[\s\t\r\n]*>", RegexOptions.IgnoreCase);
+                    var regImg = new Regex(@"<img\b[^<>]*?\bsrc[\s\t\r\n]*=[\s\t\r\n]*[""']?[\s\t\r\n]*(?<imgUrl>[^\t\r\n""'<>]*)[^<>]*?/?[\s\t\r\n]*>", RegexOptions.IgnoreCase);
                     var matches = regImg.Matches(data);
                     if (matches.Count > 0)
                     {
                         Directory.CreateDirectory("ImageCache");
-                    }
-                    foreach (var match in matches.Cast<Match>())
-                    {
-                        var url = match.Groups["imgUrl"].Value;
-                        var client = new HttpClient();
-                        var buf = await client.GetByteArrayAsync(url);
-                        var name = url[(url.LastIndexOf('/')+1)..];
-                        var path = "ImageCache\\" + name;
-                        //为无扩展名的添加
-                        if (name.LastIndexOf('.') == -1)
+                        foreach (var match in matches.Cast<Match>())
                         {
-                            path += BitConverter.ToUInt16(buf) switch
+                            var url = match.Groups["imgUrl"].Value;
+                            var uri = new Uri(url);
+                            string path;
+                            // 如果是本地文件 验证存在后发送
+                            if (uri.IsFile)
                             {
-                                0x4D42 => ".bmp",
-                                0x8DFF => ".jpg",
-                                0x5089 => ".png",
-                                0x4952 => ".webp",
-                                0x4947 => ".gif",
-                                _ => "",
-                            };
+                                path = uri.LocalPath;
+                                if (!File.Exists(path))
+                                    continue;
+                            }
+                            else //网络图片进行下载
+                            {
+                                var client = new HttpClient();
+                                var buf = await client.GetByteArrayAsync(uri);
+                                var name = url[(url.LastIndexOf('/') + 1)..];
+                                path = "ImageCache\\" + name;
+                                //为无扩展名的添加
+                                if (name.LastIndexOf('.') == -1)
+                                {
+                                    path += BitConverter.ToUInt16(buf) switch
+                                    {
+                                        0x4D42 => ".bmp",
+                                        0x8DFF => ".jpg",
+                                        0x5089 => ".png",
+                                        0x4952 => ".webp",
+                                        0x4947 => ".gif",
+                                        _ => "",
+                                    };
+                                }
+                                var file = File.Create(path);
+                                file.Write(buf);
+                                file.Close();
+                            }
+                            contact.SendFile(path);
                         }
-                        var file = File.Create(path);
-                        file.Write(buf);
-                        file.Close();
-                        contact.SendFile(path);
+                        return;
                     }
                 }
-                else if (e.Data.GetDataPresent(DataFormats.Text))
+                if (dataObject.GetDataPresent(DataFormats.Text))
                 {
-                    contact.SendMessage((string)e.Data.GetData(DataFormats.Text));
+                    contact.SendMessage((string)dataObject.GetData(DataFormats.Text));
                 }
             }
         }
