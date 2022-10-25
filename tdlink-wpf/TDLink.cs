@@ -189,7 +189,7 @@ namespace tdlink_wpf
 
         private static void Run()
         {
-            BoardcastOnline();
+            SendOnlineMessage("255.255.255.255");
             while (running)
             {
                 var raddr = new IPEndPoint(IPAddress.Any, 0);
@@ -235,9 +235,9 @@ namespace tdlink_wpf
             BoardcastOffline();
         }
 
-        public static void BoardcastOnline()
+        public static void SendOnlineMessage(string ip)
         {
-            Send(PacketType.ONLINE, Encoding.UTF8.GetBytes(Name), "255.255.255.255");
+            Send(PacketType.ONLINE, Encoding.UTF8.GetBytes(Name), ip);
         }
 
         public static void BoardcastOffline()
@@ -257,8 +257,8 @@ namespace tdlink_wpf
         {
             var name = data.Length > 0 ? Encoding.UTF8.GetString(data) : ip;
             //Contacts[ip] = new Contact { Name = name };
-            Application.Current.Dispatcher.BeginInvoke(new Action(() =>
-            {
+
+            Application.Current.Dispatcher.BeginInvoke(new Action(() => {
                 foreach (var contact in Contacts)
                 {
                     if (contact.Addr == ip)
@@ -268,23 +268,22 @@ namespace tdlink_wpf
                     }
                 }
                 Contacts.Add(new Contact(ip, name));
+                SendOnlineMessage(ip);
             }));
+            
 
         }
 
         private static void Offline(string ip)
         {
-            Application.Current.Dispatcher.Invoke(new Action(() =>
+            for (int i = 0; i < Contacts.Count; i++)
             {
-                for (int i = 0; i < Contacts.Count; i++)
+                if (Contacts[i].Addr == ip)
                 {
-                    if (Contacts[i].Addr == ip)
-                    {
-                        Contacts.RemoveAt(i);
-                        break;
-                    }
+                    Application.Current.Dispatcher.Invoke(new Action(() => Contacts.RemoveAt(i)));
+                    break;
                 }
-            }));
+            }
         }
 
         private static void Message(byte[] data, string ip)
