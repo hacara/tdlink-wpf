@@ -19,6 +19,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 
 namespace tdlink_wpf
 {
@@ -35,6 +36,7 @@ namespace tdlink_wpf
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             ContactsList.ItemsSource = TDLink.Contacts;
+            Title = TDLink.Name;
             TDLink.Start();
         }
 
@@ -146,7 +148,7 @@ namespace tdlink_wpf
                 else if (dataObject.GetDataPresent(DataFormats.FileDrop))
                 {
                     foreach (var path in (string[])dataObject.GetData(DataFormats.FileDrop))
-                        contact.SendFile(path);
+                            contact.SendFile(path);
                 }
                 else if (dataObject.GetDataPresent(DataFormats.Html))
                 {
@@ -209,10 +211,8 @@ namespace tdlink_wpf
             if (ContactsList.SelectedItem is Contact contact)
             {
                 var msg = (FileMessage)((Hyperlink)sender).DataContext;
-                if (await contact.ReciveFile(msg))
-                {
-                    ((StackPanel)FindListViewItemElementWithTemplateSelector(MessageList, msg, "afterSaved")).Visibility = Visibility.Visible;
-                }
+                await contact.ReciveFile(msg);
+                ((StackPanel)FindListViewItemElementWithTemplateSelector(MessageList, msg, "afterSaved")).Visibility = Visibility.Visible;
             }
         }
 
@@ -254,8 +254,7 @@ namespace tdlink_wpf
                     var pathTemp = msg.Path;
                     msg.Path = "Cache";
                     path = msg.FullName;
-                    if (!await contact.ReciveFile(msg))
-                        return;
+                    await contact.ReciveFile(msg);
                     msg.Path = pathTemp;
                 }
                 else
@@ -280,8 +279,7 @@ namespace tdlink_wpf
                     var pathTemp = msg.Path;
                     msg.Path = "Cache";
                     path = msg.FullName;
-                    if (!await contact.ReciveFile(msg))
-                        return;
+                    await contact.ReciveFile(msg);
                     msg.Path = pathTemp;
                 }
                 else

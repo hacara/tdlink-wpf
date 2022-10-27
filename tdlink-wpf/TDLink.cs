@@ -4,10 +4,12 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Drawing;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Mime;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Security.Policy;
 using System.Text;
 using System.Text.Unicode;
@@ -26,27 +28,49 @@ namespace tdlink_wpf
         public string? Name { get; set; }
         public string? Path { get; set; }
         public long Size { get; set; }
+        public bool IsDirectory { get; set; }
         public string FullName { get { return Path + '\\' + Name; } }
 
-        public static FileInfomation New(string name, long size)
+        public static FileInfomation New(string name, long size, bool isDirectory)
         {
             return new()
             {
                 Name = name,
                 Path = ".\\RecvFiles",
                 Size = size,
+                IsDirectory = isDirectory
             };
         }
 
         public static FileInfomation New(string path)
         {
-            var fileInfo = new FileInfo(path);
-            return new()
+            
+            if (Directory.Exists(path))
             {
-                Name = fileInfo.Name,
-                Path = fileInfo.Directory!.FullName,
-                Size = fileInfo.Length,
-            };
+                var folderInfo = new DirectoryInfo(path);
+                var size = 0L;
+                foreach (var file in folderInfo.GetFiles())
+                    size += file.Length;
+                path = folderInfo.FullName;
+                return new()
+                {
+                    Name = folderInfo.Name,
+                    Path = path[..path.LastIndexOf('\\')],
+                    Size = size,
+                    IsDirectory = true
+                };
+            }
+            else
+            {
+                var fileInfo = new FileInfo(path);
+                return new()
+                {
+                    Name = fileInfo.Name,
+                    Path = fileInfo.Directory!.FullName,
+                    Size = fileInfo.Length,
+                    IsDirectory = false
+                };
+            }
         }
 
         public string GetFormatedSize()
@@ -97,7 +121,7 @@ namespace tdlink_wpf
         {
             var id = SendFiles.Count;
             var fileInfo = FileInfomation.New(path);
-            var buf = new List<byte>();
+            var buf = new List<byte> { (byte)(fileInfo.IsDirectory ? 1 : 0) };
             buf.AddRange(BitConverter.GetBytes(id));
             
             buf.AddRange(BitConverter.GetBytes(fileInfo.Size));
@@ -110,12 +134,11 @@ namespace tdlink_wpf
             TDLink.Send(TDLink.PacketType.FILE, buf.ToArray(), Addr);
         }
 
-        public async Task<bool> ReciveFile(FileMessage msg, bool overwrite = false)
+        public async Task ReciveFile(FileMessage msg, bool overwrite = false)
         {
             var server = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             server.Bind(new IPEndPoint(IPAddress.Any, 0));
             server.Listen();
-            server.ReceiveTimeout = 5000;
 
             //构造发送UDP包通知对方
             var packet = new List<byte>();
@@ -128,39 +151,52 @@ namespace tdlink_wpf
 
             Directory.CreateDirectory(msg.Path!);
 
-            var path = msg.FullName;
-            if (!overwrite)
+            string path;
+            if (msg.IsDirectory)
             {
-                //如果重名就追加(数字) file(1) file(2)
-                var dot = path.LastIndexOf('.');
-                var destPath = path;
-                var i = 1;
-                for (; File.Exists(destPath); i++)
-                    destPath = path.Insert(dot, string.Format("({0})", i));
-                if (i != 1)
+                path = "Cache\\" + Path.GetRandomFileName();
+            }
+            else
+            {
+                path = msg.FullName;
+
+                if (!overwrite)
                 {
-                    path = destPath;
-                    var slash = destPath.LastIndexOf('\\');
-                    msg.Path = destPath[..slash];
-                    msg.Name = destPath[(slash+1)..];
+                    //如果重名就追加(数字) file(1) file(2)
+                    var dot = path.LastIndexOf('.');
+                    var destPath = path;
+                    var i = 1;
+                    for (; File.Exists(destPath); i++)
+                        destPath = path.Insert(dot, string.Format("({0})", i));
+                    if (i != 1)
+                    {
+                        path = destPath;
+                        var slash = destPath.LastIndexOf('\\');
+                        msg.Path = destPath[..slash];
+                        msg.Name = destPath[(slash + 1)..];
+                    }
                 }
             }
             var file = File.Open(path, FileMode.OpenOrCreate);
-            var remainder = msg.Size;
             var buf = new byte[1024];
             while (true)
             {
                 var size = client.Receive(buf);
-                remainder -= size;
                 file.Write(buf, 0, size);
-                if (remainder <= 0 || size == 0)
+                if (size == 0)
                     break;
             }
             file.Close();
             client.Close();
             server.Close();
 
-            return remainder == 0;
+            if (msg.IsDirectory)
+            {
+                var destPath = msg.FullName;
+                Directory.CreateDirectory(destPath);
+                ZipFile.ExtractToDirectory(path, destPath, true);
+            }
+
             //if (MessageBox.Show("下载结束\n是否打开所在目录?", "提示", MessageBoxButton.YesNo) == MessageBoxResult.Yes)
             //    System.Diagnostics.Process.Start("Explorer.exe", fileInfo.Path);
         }
@@ -307,10 +343,11 @@ namespace tdlink_wpf
         }
         private static void File(byte[] data, string ip)
         {
-            var id = BitConverter.ToInt32(data);
-            var size = BitConverter.ToInt64(data, 4);
-            var name = Encoding.UTF8.GetString(data[12..]);
-            var fileInfo = FileInfomation.New(name, size);
+            var isDirectory = data[0] == 1;
+            var id = BitConverter.ToInt32(data, 1);
+            var size = BitConverter.ToInt64(data, 5);
+            var name = Encoding.UTF8.GetString(data[13..]);
+            var fileInfo = FileInfomation.New(name, size, isDirectory);
 
             foreach (var contact in Contacts)
             {
@@ -337,7 +374,21 @@ namespace tdlink_wpf
                     var endPoint = IPEndPoint.Parse(addr);
                     endPoint.Address = IPAddress.Parse("127.0.0.1");
                     socket.ConnectAsync(endPoint).Wait(5000);
-                    await socket.SendFileAsync(contact.SendFiles[id].FullName);
+
+                    var fileInfo = contact.SendFiles[id];
+                    string path;
+                    if (fileInfo.IsDirectory)
+                    {
+                        path = "Cache\\" + fileInfo.Name + ".zip";
+                        System.IO.File.Delete(path);
+                        ZipFile.CreateFromDirectory(fileInfo.FullName, path);
+                    }
+                    else
+                        path = fileInfo.FullName;
+                    
+
+                    await socket.SendFileAsync(path);
+                    socket.Close();
                     return;
                 }
             }

@@ -62,6 +62,7 @@ namespace tdlink_wpf
                 Name = name,
                 Size = fileInfo.Size,
                 Path = fileInfo.Path,
+                IsDirectory = fileInfo.IsDirectory,
 
                 Type = type,
                 Time = DateTime.Now.ToLongTimeString(),
